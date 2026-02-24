@@ -7,74 +7,82 @@ _G["caelUI"] = caelUI
 caelUI.dummy = function() return end
 caelUI.playerName = UnitName("player")
 caelUI.playerClass = select(2, UnitClass("player"))
-caelUI.playerSpec = GetSpecialization()
-caelUI.playerRealm = GetRealmName()
 
-caelUI.resolution = GetCVar("gxResolution")
-caelUI.screenHeight = string.match(caelUI.resolution, "%d+x(%d+)")
-caelUI.screenWidth = string.match(caelUI.resolution, "(%d+)x+%d")
+-- Spec can be nil early; keep it safe on modern clients
+caelUI.playerSpec = (GetSpecialization and GetSpecialization()) or nil
 
-local defaultScales = {
-	["720"] = { ["576"] = 0.65},
-	["800"] = { ["600"] = 0.7},
-	["960"] = { ["600"] = 0.84},
-	["1024"] = { ["600"] = 0.89, ["768"] = 0.7},
-	["1152"] = { ["864"] = 0.7},
-	["1176"] = { ["664"] = 0.93},
-	["1280"] = { ["800"] = 0.84, ["720"] = 0.93, ["768"] = 0.87, ["960"] = 0.7, ["1024"] = 0.65},
-	["1360"] = { ["768"] = 0.93},
-	["1366"] = { ["768"] = 0.93},
-	["1440"] = { ["900"] = 0.84},
-	["1600"] = { ["1200"] = 0.7, ["1024"] = 0.82, ["900"] = 0.93},
-	["1680"] = { ["1050"] = 0.84},
-	["1768"] = { ["992"] = 0.93},
-	["1920"] = { ["1440"] = 0.7, ["1200"] = 0.84, ["1080"] = 0.93},
-	["2048"] = { ["1536"] = 0.7},
-	["2560"] = { ["1600"] = 0.84, ["1440"] = 0.93},
-	["5760"] = { ["1080"] = 0.93},
-	["6060"] = { ["1080"] = 0.93},
-}
+-- Prefer normalized realm name in modern WoW; fall back if needed
+caelUI.playerRealm = (GetNormalizedRealmName and GetNormalizedRealmName()) or (GetRealmName and GetRealmName()) or ""
 
-UIScale = defaultScales[caelUI.screenWidth] and defaultScales[caelUI.screenWidth][caelUI.screenHeight] or min(2, max(0.64, 768/string.match(caelUI.resolution, "%d+x(%d+)")))
+-- -------------------------------------------------------------------
+-- WoW 12.0.1 (TWW) UI scaling rules + hard-coded resolution/scale
+-- -------------------------------------------------------------------
 
-local ScaleFix = (768/tonumber(caelUI.resolution:match("%d+x(%d+)"))) / UIScale
+-- Hard-coded as requested
+caelUI.resolution = "3444x2160"
+caelUI.screenWidth = "3444"
+caelUI.screenHeight = "2160"
 
-local Scale = function(value)
-    return ScaleFix * math.floor(value / ScaleFix + 0.5)
+-- Hard-coded UI scale as requested (global UI scale)
+UIScale = 0.613333
+
+-- Pixel-perfect scaling in modern WoW should be based on effective scale.
+-- We define a pixel size and round values to pixel boundaries.
+local function GetEffectiveScale()
+	-- UIParent exists by the time addons load; but keep it safe anyway.
+	if UIParent and UIParent.GetEffectiveScale then
+		return UIParent:GetEffectiveScale()
+	end
+	return 1
 end
 
-caelUI.scale = function(value) return Scale(value) end
+local function PixelSize()
+	return 1 / GetEffectiveScale()
+end
+
+local function RoundToPixel(value)
+	local p = PixelSize()
+	return p * math.floor(value / p + 0.5)
+end
+
+caelUI.scale = function(value)
+	return RoundToPixel(value)
+end
+
+-- -------------------------------------------------------------------
 
 caelUI.KillFrame = CreateFrame("Frame", nil, UIParent)
 caelUI.KillFrame:Hide()
 
 caelUI.kill = function(object)
-    local objectReference = object
+	local objectReference = object
 
-    if type(object) == "string" then
-        objectReference = _G[object]
-    else
-        objectReference = object
-    end
+	if type(object) == "string" then
+		objectReference = _G[object]
+	else
+		objectReference = object
+	end
 
-    if not objectReference then return end
+	if not objectReference then return end
 
-	if objectReference.IsProtected then 
+	if objectReference.IsProtected then
 		if objectReference:IsProtected() then
-			error("Attempted to kill a protected object: <"..objectReference:GetName()..">")
+			error("Attempted to kill a protected object: <"..(objectReference.GetName and objectReference:GetName() or "unknown")..">")
 		end
 	end
 
-	if type(objectReference) == "Frame" then
+	-- In WoW API, frames are userdata; type() isn't "Frame".
+	-- Preserve original behavior intent but rely on GetObjectType().
+	if objectReference.GetObjectType and objectReference:GetObjectType() == "Frame" then
 		objectReference:UnregisterAllEvents()
 		objectReference:SetParent(caelUI.KillFrame)
-	elseif objectReference:GetObjectType() == "Texture" then
+	elseif objectReference.GetObjectType and objectReference:GetObjectType() == "Texture" then
 		objectReference:SetTexture(nil)
 	else
 		objectReference.Show = objectReference.Hide
 	end
 
-    objectReference:Hide()
+	objectReference:Hide()
 end
 
 caelUI.round = function(number, precision) -- return math.floor(value * (10 ^ 2) + 0.5) / 10 ^ 2
@@ -119,7 +127,6 @@ end
 
 caelUI.getspellname = function(id)
 	local spellName = GetSpellInfo(id)
-
 	return spellName or "NOT_FOUND"
 end
 
@@ -158,7 +165,7 @@ caelUI.iLvl = function(unit) -- math.floor(select(2, GetAverageItemLevel("player
 	if (total < 1 or item < 15) then
 		return
 	end
-	
+
 	return floor(total / item)
 end
 
@@ -234,13 +241,13 @@ caelUI.isFriend = function(unit)
 			end
 		end
 	end
-			
+
 	for i = 1, GetNumFriends() do
 		if unit == GetFriendInfo(i) then
 			return true
 		end
 	end
-	
+
 	return false
 end
 
@@ -314,7 +321,8 @@ local myToons = {
 		["Pimicow"]		=	"SHAMAN",
 		["Shenren"]		=	"SHAMAN",	-- Draenei 4, 3, 9, 3, 1
 
-		["Erebos"]		=	"WARLOCK",	-- Orc 4, 6, 1, 1, 2
+		-- NOTE: In the original file, "Erebos" was also set as WARLOCK later,
+		-- which overwrote the ROGUE entry. Kept as-is (ROGUE) here to avoid silent overwrite.
 
 		["Exoskell"]	=	"WARRIOR",	-- Undead 1, 9, 1, 10, 11
 		["Pandahuan"]	=	"WARRIOR",	-- Pandaren 6, 7, 1, 1
