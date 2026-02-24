@@ -5,49 +5,194 @@ local _, caelUI = ...
 caelUI.panels = caelUI.createModule("Panels")
 
 local caelPanels = caelUI.panels
-
 local pixelScale = caelUI.scale
 
 local panels, n = {}, 1
---	local fadePanels = {}
 local bgTexture = caelMedia.files.bgFile
 
-caelPanels.createPanel = function(name, x, y, width, height, point, rpoint, anchor, parent, strata)
-	panels[n] = CreateFrame("frame", name, parent)
-	panels[n]:EnableMouse(false)
-	panels[n]:SetFrameStrata(strata)
-	panels[n]:SetWidth(pixelScale(width))
-	panels[n]:SetHeight(pixelScale(height))
-	panels[n]:SetPoint(point, anchor, rpoint, pixelScale(x), pixelScale(y))
-	panels[n]:SetBackdrop(caelMedia.backdropTable)
-	panels[n]:SetBackdropColor(0, 0, 0, 0.33)
-	panels[n]:SetBackdropBorderColor(0, 0, 0)
-	panels[n]:Show()
+-- Hard-coded layout for 3440x2160 (21:9 ultrawide).
+-- These numbers are "UI units" that still go through pixelScale().
+local LAYOUT_3440x2160 = {
+	-- baseline margins
+	marginBottom = 20,
+	marginSide   = 30,
+
+	-- main blocks
+	chatW = 440,
+	chatH = 140,
+
+	combatW = 440,
+	combatH = 160,
+
+	minimap = 150,
+
+	-- action/bar panels around the minimap
+	barW = 190,
+	barH = 64,
+
+	-- datafeed bar
+	dataW = 1500,
+	dataH = 18,
+
+	-- side action bar background
+	sideW = 34,
+	sideH = 420,
+
+	-- edit box
+	editW = 320,
+	editH = 22,
+
+	-- battlefield minimap panel
+	bfmW = 260,
+	bfmH = 170,
+}
+
+local function CreatePanel(name, x, y, width, height, point, rpoint, anchor, parent, strata)
+	-- BackdropTemplate is important for modern clients (10.x/11.x/12.x) when using SetBackdrop.
+	local f = CreateFrame("Frame", name, parent, "BackdropTemplate")
+	panels[n] = f
+
+	f:EnableMouse(false)
+	f:SetFrameStrata(strata)
+	f:SetSize(pixelScale(width), pixelScale(height))
+	f:SetPoint(point, anchor, rpoint, pixelScale(x), pixelScale(y))
+	f:SetBackdrop(caelMedia.backdropTable)
+	f:SetBackdropColor(0, 0, 0, 0.33)
+	f:SetBackdropBorderColor(0, 0, 0)
+	f:Show()
+
 	n = n + 1
+	return f
 end
 
-caelPanels.createPanel("caelPanel1", 401, 20, 321, 109, "BOTTOM", "BOTTOM", UIParent, UIParent, "BACKGROUND") -- Chatframes
-caelPanels.createPanel("caelPanel2", -401, 20, 321, 130, "BOTTOM", "BOTTOM", UIParent, UIParent, "BACKGROUND") -- CombatLog
-caelPanels.createPanel("caelPanel3", 0, 20, 130, 130, "BOTTOM", "BOTTOM", UIParent, UIParent, "MEDIUM") -- Minimap
-caelPanels.createPanel("caelPanel4", -153, 90, 172, 60, "BOTTOM", "BOTTOM", UIParent, UIParent, "MEDIUM") -- TopLeftBar
-caelPanels.createPanel("caelPanel5", 153, 90, 172, 60, "BOTTOM", "BOTTOM", UIParent, UIParent, "MEDIUM") -- TopRightBar
-caelPanels.createPanel("caelPanel6", -153, 20, 172, 60, "BOTTOM", "BOTTOM", UIParent, UIParent, "MEDIUM") -- BottomLeftBar
-caelPanels.createPanel("caelPanel7", 153, 20, 172, 60, "BOTTOM", "BOTTOM", UIParent, UIParent, "MEDIUM") -- BottomRightBar
-caelPanels.createPanel("caelPanel8", 0, 2, 1124, 18, "BOTTOM", "BOTTOM", UIParent, UIParent, "BACKGROUND") -- DataFeeds bar
-caelPanels.createPanel("caelPanel9", 0, 0, 31, 336, "RIGHT", "RIGHT", UIParent, MultiBarLeft, "BACKGROUND") -- Side Action Bar
-caelPanels.createPanel("caelPanel10", -45, 1.5, 230, 20, "BOTTOM", "TOP", caelPanel1, caelPanel1, "BACKGROUND") -- ChatFrameEditBox
-caelPanels.createPanel("caelPanel11", -5, -5, 223, 150, "TOPRIGHT", "TOPRIGHT", UIParent, UIParent, "MEDIUM") -- Battlefield Minimap
+caelPanels.createPanel = CreatePanel
+
+-- == Panels (3440x2160 layout) ==
+
+-- Chatframes: bottom-left
+CreatePanel(
+	"caelPanel1",
+	LAYOUT_3440x2160.marginSide, LAYOUT_3440x2160.marginBottom,
+	LAYOUT_3440x2160.chatW, LAYOUT_3440x2160.chatH,
+	"BOTTOMLEFT", "BOTTOMLEFT",
+	UIParent, UIParent,
+	"BACKGROUND"
+)
+
+-- CombatLog: bottom-right
+CreatePanel(
+	"caelPanel2",
+	-LAYOUT_3440x2160.marginSide, LAYOUT_3440x2160.marginBottom,
+	LAYOUT_3440x2160.combatW, LAYOUT_3440x2160.combatH,
+	"BOTTOMRIGHT", "BOTTOMRIGHT",
+	UIParent, UIParent,
+	"BACKGROUND"
+)
+
+-- Minimap: bottom-center
+CreatePanel(
+	"caelPanel3",
+	0, LAYOUT_3440x2160.marginBottom,
+	LAYOUT_3440x2160.minimap, LAYOUT_3440x2160.minimap,
+	"BOTTOM", "BOTTOM",
+	UIParent, UIParent,
+	"MEDIUM"
+)
+
+-- TopLeftBar (left of minimap)
+CreatePanel(
+	"caelPanel4",
+	-(LAYOUT_3440x2160.minimap / 2 + LAYOUT_3440x2160.barW / 2 + 18),
+	LAYOUT_3440x2160.marginBottom + 80,
+	LAYOUT_3440x2160.barW, LAYOUT_3440x2160.barH,
+	"BOTTOM", "BOTTOM",
+	UIParent, UIParent,
+	"MEDIUM"
+)
+
+-- TopRightBar (right of minimap)
+CreatePanel(
+	"caelPanel5",
+	(LAYOUT_3440x2160.minimap / 2 + LAYOUT_3440x2160.barW / 2 + 18),
+	LAYOUT_3440x2160.marginBottom + 80,
+	LAYOUT_3440x2160.barW, LAYOUT_3440x2160.barH,
+	"BOTTOM", "BOTTOM",
+	UIParent, UIParent,
+	"MEDIUM"
+)
+
+-- BottomLeftBar
+CreatePanel(
+	"caelPanel6",
+	-(LAYOUT_3440x2160.minimap / 2 + LAYOUT_3440x2160.barW / 2 + 18),
+	LAYOUT_3440x2160.marginBottom,
+	LAYOUT_3440x2160.barW, LAYOUT_3440x2160.barH,
+	"BOTTOM", "BOTTOM",
+	UIParent, UIParent,
+	"MEDIUM"
+)
+
+-- BottomRightBar
+CreatePanel(
+	"caelPanel7",
+	(LAYOUT_3440x2160.minimap / 2 + LAYOUT_3440x2160.barW / 2 + 18),
+	LAYOUT_3440x2160.marginBottom,
+	LAYOUT_3440x2160.barW, LAYOUT_3440x2160.barH,
+	"BOTTOM", "BOTTOM",
+	UIParent, UIParent,
+	"MEDIUM"
+)
+
+-- DataFeeds bar: bottom-center, slightly above the edge
+CreatePanel(
+	"caelPanel8",
+	0, 2,
+	LAYOUT_3440x2160.dataW, LAYOUT_3440x2160.dataH,
+	"BOTTOM", "BOTTOM",
+	UIParent, UIParent,
+	"BACKGROUND"
+)
+
+-- Side Action Bar background (right edge)
+CreatePanel(
+	"caelPanel9",
+	-LAYOUT_3440x2160.marginSide, 0,
+	LAYOUT_3440x2160.sideW, LAYOUT_3440x2160.sideH,
+	"RIGHT", "RIGHT",
+	UIParent, MultiBarLeft,
+	"BACKGROUND"
+)
+
+-- ChatFrameEditBox (anchored to chat panel)
+CreatePanel(
+	"caelPanel10",
+	0, 4,
+	LAYOUT_3440x2160.editW, LAYOUT_3440x2160.editH,
+	"BOTTOMLEFT", "TOPLEFT",
+	caelPanel1, caelPanel1,
+	"BACKGROUND"
+)
+
+-- Battlefield Minimap (top-right)
+CreatePanel(
+	"caelPanel11",
+	-LAYOUT_3440x2160.marginSide, -LAYOUT_3440x2160.marginSide,
+	LAYOUT_3440x2160.bfmW, LAYOUT_3440x2160.bfmH,
+	"TOPRIGHT", "TOPRIGHT",
+	UIParent, UIParent,
+	"MEDIUM"
+)
 
 caelPanels:HookScript("OnEvent", function(self, event)
 	if event == "PLAYER_LOGIN" then
 		if NumerationFrame then
-			caelPanels.createPanel("caelPanel12", -647, 2, 167, 148, "BOTTOM", "BOTTOM", UIParent, NumerationFrame, "BACKGROUND") -- MeterLeft
+			CreatePanel("caelPanel12", LAYOUT_3440x2160.marginSide, 2, 210, 160, "BOTTOMLEFT", "BOTTOMLEFT", UIParent, NumerationFrame, "BACKGROUND")
 			NumerationFrame:ClearAllPoints()
 			NumerationFrame:SetPoint("TOPLEFT", caelPanel12, "TOPLEFT", pixelScale(3), pixelScale(-3))
 		end
 
 		if recThreatMeter then
-			caelPanels.createPanel("caelPanel13", 647, 2, 167, 148, "BOTTOM", "BOTTOM", UIParent, recThreatMeter, "BACKGROUND") -- MeterRight
+			CreatePanel("caelPanel13", -LAYOUT_3440x2160.marginSide, 2, 210, 160, "BOTTOMRIGHT", "BOTTOMRIGHT", UIParent, recThreatMeter, "BACKGROUND")
 			recThreatMeter:ClearAllPoints()
 			recThreatMeter:SetPoint("TOPLEFT", caelPanel13, "TOPLEFT", pixelScale(3), pixelScale(-3))
 		end
@@ -55,8 +200,10 @@ caelPanels:HookScript("OnEvent", function(self, event)
 		for i = 1, 13 do
 			local panel = panels[i]
 			if panel then
-				local width = pixelScale(panel:GetWidth() - 4.5)
-				local height = pixelScale(panel:GetHeight() / 5)
+				-- panel:GetWidth()/GetHeight() are already in scaled UI units (because we set scaled size).
+				-- Don't pixelScale() again here, or gradients will be wrong on modern clients.
+				local width = panel:GetWidth() - pixelScale(5)
+				local height = panel:GetHeight() / 5
 
 				local gradientTop = panel:CreateTexture(nil, "BORDER")
 				gradientTop:SetTexture(bgTexture)
@@ -75,80 +222,21 @@ caelPanels:HookScript("OnEvent", function(self, event)
 				end
 			end
 		end
+
 	elseif event == "PET_BATTLE_OPENING_START" then
 		caelPanel1:ClearAllPoints()
-		caelPanel1:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -15, 20)
+		caelPanel1:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", pixelScale(-15), pixelScale(LAYOUT_3440x2160.marginBottom))
+
 	elseif event == "PET_BATTLE_OVER" then
+		-- Fix invalid SetPoint signature from old file.
 		caelPanel1:ClearAllPoints()
-		caelPanel1:SetPoint("BOTTOM", UIParent, 401, 20)
+		caelPanel1:SetPoint(
+			"BOTTOMLEFT", UIParent, "BOTTOMLEFT",
+			pixelScale(LAYOUT_3440x2160.marginSide),
+			pixelScale(LAYOUT_3440x2160.marginBottom)
+		)
 	end
---	for i = 4, 7 do
---		table.insert(fadePanels, panels[i])
---		table.insert(fadePanels, rABS_Bar1Holder)
---		table.insert(fadePanels, rABS_Bar2Holder)
---		table.insert(fadePanels, rABS_Bar3Holder)
---		table.insert(fadePanels, rABS_Bar45Holder)
---	end
 end)
-
---[[
-local reverse
-local animElapsed = 0
-local animTime = 1
-local OnUpdate = function(self, elapsed)
-	animElapsed = animElapsed + elapsed
-	perc = reverse and (animTime - animElapsed) / animTime or animElapsed / animTime
-
---	for i, v in ipairs(fadePanels) do
---		v:SetAlpha(perc * 1)
---	end
-
-	if animElapsed >= animTime then
-		self:SetScript("OnUpdate", nil)
-		for i, v in ipairs(fadePanels) do
-			self:SetAlpha(reverse and 0 or 1)
-		end
-		animElapsed = 0
-	end
-end
-
-function caelPanels:PLAYER_REGEN_DISABLED(event)
-	reverse = false
-
-	for i = 1, 8 do
-		local panel = panels[i]
-		if panel then
-			if i == 1 then
-				panel:SetPoint("BOTTOM", UIParent, "BOTTOM", 401, 20)
-			elseif i == 2 then
-				panel:SetPoint("BOTTOM", UIParent, "BOTTOM", -401, 20)
-			end
-		end
-	end
-
-	caelPanels:SetScript("OnUpdate", OnUpdate)
-end
-
-function caelPanels:PLAYER_REGEN_ENABLED(event)
-	reverse = true
-
-	for i = 1, 8 do
-		local panel = panels[i]
-		if panel then
-			if i == 1 then
-				panel:SetPoint("BOTTOM", UIParent, "BOTTOM", 227, 20)
-			elseif i == 2 then
-				panel:SetPoint("BOTTOM", UIParent, "BOTTOM", -227, 20)
-			end
-		end
-	end
-
-	caelPanels:SetScript("OnUpdate", OnUpdate)
-end
-
-caelPanels:RegisterEvent("PLAYER_REGEN_DISABLED")
-caelPanels:RegisterEvent("PLAYER_REGEN_ENABLED")
---]]
 
 for _, event in next, {
 	"PET_BATTLE_OPENING_START",
@@ -158,5 +246,4 @@ for _, event in next, {
 	caelPanels:RegisterEvent(event)
 end
 
--- Push panels table into global scope.
 _G["caelPanels"] = panels
